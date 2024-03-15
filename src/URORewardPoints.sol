@@ -32,6 +32,7 @@ contract URORewardPoints {
     }
 
     function stake(uint256 amount) external {
+        require(address(token) != address(0), "Token address cannot be zero");
         require(amount > 0, "Cannot stake 0");
         require(token.allowance(msg.sender, address(this)) >= amount, "Insufficient allowance. Please approve tokens before staking.");
         stakes[msg.sender].push(Stake(amount, block.timestamp));
@@ -40,7 +41,16 @@ contract URORewardPoints {
         emit Staked(msg.sender, amount, block.timestamp);
     }
 
+    function stakeNative() external payable {
+        require(address(token) == address(0), "Non-applicable");
+        require(msg.value > 0, "Cannot stake 0");
+        stakes[msg.sender].push(Stake(msg.value, block.timestamp));
+
+        emit Staked(msg.sender, msg.value, block.timestamp);
+    }
+
     function unstake(uint256 amount) external {
+        require(address(token) != address(0), "Token address cannot be zero");
         require(amount > 0, "Cannot unstake 0");
         uint256 totalStaked = getTotalStaked(msg.sender);
         require(totalStaked >= amount, "Insufficient staked amount");
@@ -49,6 +59,18 @@ contract URORewardPoints {
 
         require(token.transfer(msg.sender, amount), "Unstake transfer failed");
         emit Unstaked(msg.sender, amount, block.timestamp);
+    }
+
+    function unstakeNative(uint256 amount) external {
+        require(address(token) == address(0), "Non-applicable");
+        require(amount > 0, "Cannot unstake 0");
+        uint256 totalStaked = getTotalStaked(msg.sender);
+        require(totalStaked >= amount, "Insufficient staked amount");
+
+        unstakes[msg.sender].push(Unstake(amount, block.timestamp));
+
+        (bool sent, ) = msg.sender.call{value: amount}("");
+        require(sent, "Failed to send Ether");
     }
 
     function getTotalStaked(address user) public view returns (uint256 total) {
