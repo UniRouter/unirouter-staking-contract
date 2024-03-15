@@ -70,7 +70,7 @@ contract URORewardPoints {
         unstakes[msg.sender].push(Unstake(amount, block.timestamp));
 
         (bool sent, ) = msg.sender.call{value: amount}("");
-        require(sent, "Failed to send Ether");
+        require(sent, "Failed to send native token");
     }
 
     function getTotalStaked(address user) public view returns (uint256 total) {
