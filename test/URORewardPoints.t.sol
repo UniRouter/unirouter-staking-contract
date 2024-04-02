@@ -34,7 +34,7 @@ contract URORewardPointsETHTest is Test {
         assertEq(user.balance, 1 ether);
 
         vm.warp(100);
-        assertEq(uroRewardPoints.calculatePoints(user), 100*2*1e18);
+        assertEq(uroRewardPoints.calculatePoints(user), 100 * 2 * 1e18);
         vm.stopPrank();
     }
 
@@ -51,7 +51,7 @@ contract URORewardPointsETHTest is Test {
 
         assertEq(uroRewardPoints.getTotalStaked(user), 0, "Staked token should be empty.");
         assertEq(user.balance, amount);
-        assertEq(uroRewardPoints.calculatePoints(user), 100*2*1e18);
+        assertEq(uroRewardPoints.calculatePoints(user), 100 * 2 * 1e18);
         vm.stopPrank();
     }
 }
@@ -79,9 +79,9 @@ contract URORewardPointsERC20Test is Test {
 
         assertEq(uroRewardPoints.getTotalStaked(user), amount, "Staked token should be equal to amount.");
         assertEq(mockERC20.balanceOf(address(user)), 90, "ERC20 token balance should be reduced by staked amount");
-        
+
         vm.warp(100);
-        assertEq(uroRewardPoints.calculatePoints(user), 10*100);
+        assertEq(uroRewardPoints.calculatePoints(user), 10 * 100);
         vm.stopPrank();
     }
 
@@ -98,10 +98,10 @@ contract URORewardPointsERC20Test is Test {
 
         assertEq(uroRewardPoints.getTotalStaked(user), 1, "Staked token should be reduced.");
         assertEq(mockERC20.balanceOf(address(user)), 99, "ERC20 token balance should be reduced by staked amount");
-        assertEq(uroRewardPoints.calculatePoints(user), 100*10);
+        assertEq(uroRewardPoints.calculatePoints(user), 100 * 10);
 
         vm.warp(200);
-        assertEq(uroRewardPoints.calculatePoints(user), 100*10+1*100);
+        assertEq(uroRewardPoints.calculatePoints(user), 100 * 10 + 1 * 100);
         vm.stopPrank();
     }
 }
