@@ -3,104 +3,105 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "../src/URORewardPoints.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract MockERC20 is IERC20 {
-    mapping(address => uint256) public balances;
-    mapping(address => uint256) public allowanceAmount;
+contract MockERC20 is ERC20 {
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
 
-    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool) {
-        require(balances[sender] >= amount, "Insufficient balance");
-        balances[sender] -= amount;
-        balances[recipient] += amount;
-        return true;
-    }
-
-    function transfer(address recipient, uint256 amount) external returns (bool) {
-        require(balances[msg.sender] >= amount, "Insufficient balance");
-        balances[msg.sender] -= amount;
-        balances[recipient] += amount;
-        return true;
-    }
-
-    function approve(address spender, uint256 amount) external returns (bool) {
-        allowanceAmount[spender] = amount;
-        return true;
-    }
-
-    function allowance(address owner, address spender) external view returns (uint256) {
-        return allowanceAmount[spender];
-    }
-
-    // For testing purposes, allow directly setting balances
-    function setBalance(address account, uint256 amount) external {
-        balances[account] = amount;
+    function mint(address to, uint256 amount) public {
+        _mint(to, amount);
     }
 }
 
-contract URORewardPointsTest is Test {
-    URORewardPoints public uroRewardPoints;
-    MockERC20 public token;
+contract URORewardPointsETHTest is Test {
+    URORewardPoints uroRewardPoints;
+    address user;
 
     function setUp() public {
-        token = new MockERC20();
-        uroRewardPoints = new URORewardPoints(address(token));
-        token.approve(address(uroRewardPoints), 1000);
+        uroRewardPoints = new URORewardPoints(address(0));
+        user = address(0xBEEF);
     }
 
-    function testStake() public {
-        address user = address(0xBEEF);
-        token.setBalance(user, 100);
-
+    function testStakeETH() public {
         vm.startPrank(user);
-        uroRewardPoints.stake(50);
-        vm.stopPrank();
 
-        assertEq(uroRewardPoints.getTotalStaked(user), 50);
-        assertEq(token.balances(user), 50);
-
-        vm.startPrank(user);
-        vm.expectRevert("Insufficient balance");
-        uroRewardPoints.stake(200);
-        vm.stopPrank();
-    }
-
-    function testUnstake() public {
-        address user = address(0xBEEF);
-        token.setBalance(user, 100);
-
-        vm.startPrank(user);
-        uroRewardPoints.stake(100);
-        uroRewardPoints.unstake(50);
-        vm.stopPrank();
-
-        assertEq(uroRewardPoints.getTotalStaked(user), 50);
-        assertEq(token.balances(user), 50);
-
-        vm.startPrank(user);
-        vm.expectRevert("Insufficient staked amount");
-        uroRewardPoints.unstake(200);
-        vm.stopPrank();
-    }
-
-    function testCalculatePoints() public {
-        address user = address(0xBEEF);
-        token.setBalance(user, 100);
-
-        vm.startPrank(user);
+        uint256 amount = 2 ether;
+        vm.deal(user, 3 ether);
         vm.warp(0);
-        uroRewardPoints.stake(50);
+        uroRewardPoints.stake{value: amount}(amount);
+
+        assertEq(uroRewardPoints.getTotalStaked(user), amount, "Staked token should be equal to amount.");
+        assertEq(user.balance, 1 ether);
 
         vm.warp(100);
-        uroRewardPoints.stake(30);
+        assertEq(uroRewardPoints.calculatePoints(user), 100*2*1e18);
+        vm.stopPrank();
+    }
+
+    function testUnstakeETH() public {
+        vm.startPrank(user);
+
+        uint256 amount = 2 ether;
+        vm.deal(user, amount);
+        vm.warp(0);
+        uroRewardPoints.stake{value: amount}(amount);
+
+        vm.warp(100);
+        uroRewardPoints.unstake(amount);
+
+        assertEq(uroRewardPoints.getTotalStaked(user), 0, "Staked token should be empty.");
+        assertEq(user.balance, amount);
+        assertEq(uroRewardPoints.calculatePoints(user), 100*2*1e18);
+        vm.stopPrank();
+    }
+}
+
+contract URORewardPointsERC20Test is Test {
+    URORewardPoints uroRewardPoints;
+    MockERC20 mockERC20;
+    address user;
+
+    function setUp() public {
+        mockERC20 = new MockERC20("Mock ERC20", "mERC20");
+        uroRewardPoints = new URORewardPoints(address(mockERC20));
+
+        user = address(0xBEEF);
+        mockERC20.mint(user, 100);
+    }
+
+    function testStakeERC20() public {
+        vm.startPrank(user);
+
+        vm.warp(0);
+        uint256 amount = 10;
+        mockERC20.approve(address(uroRewardPoints), amount);
+        uroRewardPoints.stake(amount);
+
+        assertEq(uroRewardPoints.getTotalStaked(user), amount, "Staked token should be equal to amount.");
+        assertEq(mockERC20.balanceOf(address(user)), 90, "ERC20 token balance should be reduced by staked amount");
+        
+        vm.warp(100);
+        assertEq(uroRewardPoints.calculatePoints(user), 10*100);
+        vm.stopPrank();
+    }
+
+    function testUnstakeERC20() public {
+        vm.startPrank(user);
+
+        vm.warp(0);
+        uint256 amount = 10;
+        mockERC20.approve(address(uroRewardPoints), amount);
+        uroRewardPoints.stake(amount);
+
+        vm.warp(100);
+        uroRewardPoints.unstake(9);
+
+        assertEq(uroRewardPoints.getTotalStaked(user), 1, "Staked token should be reduced.");
+        assertEq(mockERC20.balanceOf(address(user)), 99, "ERC20 token balance should be reduced by staked amount");
+        assertEq(uroRewardPoints.calculatePoints(user), 100*10);
 
         vm.warp(200);
-        uroRewardPoints.unstake(20);
-
-        vm.warp(300);
+        assertEq(uroRewardPoints.calculatePoints(user), 100*10+1*100);
         vm.stopPrank();
-
-        uint256 points = uroRewardPoints.calculatePoints(user);
-        uint256 expectedPoints = 50*300 + 30*200 - 20*100;
-        assertEq(points, expectedPoints);
     }
 }
