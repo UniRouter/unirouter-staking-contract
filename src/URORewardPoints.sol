@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract URORewardPoints {
     // @notice IERC20 token used for staking and unstaking; this token must not be deflationary
     // @dev The token should have a constant or increasing supply, as deflationary mechanics could disrupt staking logic
-    IERC20 public immutable token;
+    IERC20 public token;
 
     struct Stake {
         uint256 amount;
