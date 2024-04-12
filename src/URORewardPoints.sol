@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts@4.9.6/token/ERC20/IERC20.sol";
 
 // interface IERC20 {
 //     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
@@ -11,7 +11,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 // }
 
 contract URORewardPoints {
-    IERC20 public token;
+    // @notice IERC20 token used for staking and unstaking; this token must not be deflationary
+    // @dev The token should have a constant or increasing supply, as deflationary mechanics could disrupt staking logic
+    IERC20 public immutable token;
 
     struct Stake {
         uint256 amount;
@@ -29,6 +31,8 @@ contract URORewardPoints {
     event Staked(address indexed user, uint256 amount, uint256 timestamp);
     event Unstaked(address indexed user, uint256 amount, uint256 timestamp);
 
+    /// @param _tokenAddress The ERC20 token address used for staking and unstaking.
+    /// @dev The constructor requires a non-deflationary ERC20 token because deflationary tokens (tokens whose supply decreases over time due to burns or other mechanisms) can cause discrepancies in staking logic, potentially leading to errors in balance calculations or reward distributions.
     constructor(address _tokenAddress) {
         if (_tokenAddress != address(0)) {
             token = IERC20(_tokenAddress);
@@ -36,19 +40,23 @@ contract URORewardPoints {
     }
 
     function stake(uint256 amount) external payable {
+        // Checks
         require(amount > 0, "Cannot stake 0");
         if (address(token) == address(0)) {
-            // Staking native token (e.g., ETH)
             require(msg.value == amount, "Incorrect value sent");
         } else {
-            // Staking ERC20 token
             require(msg.value == 0, "Value should be 0 for ERC20");
             require(token.allowance(msg.sender, address(this)) >= amount, "Insufficient allowance");
-            require(token.transferFrom(msg.sender, address(this), amount), "Token transfer failed");
         }
 
+        // Effects
         stakes[msg.sender].push(Stake(amount, block.timestamp));
         emit Staked(msg.sender, amount, block.timestamp);
+
+        // Interactions
+        if (address(token) != address(0)) {
+            require(token.transferFrom(msg.sender, address(this), amount), "Token transfer failed");
+        }
     }
 
     function unstake(uint256 amount) external {
@@ -57,6 +65,7 @@ contract URORewardPoints {
         require(totalStaked >= amount, "Insufficient staked amount");
 
         unstakes[msg.sender].push(Unstake(amount, block.timestamp));
+        emit Unstaked(msg.sender, amount, block.timestamp);
 
         if (address(token) == address(0)) {
             // Unstaking native token
@@ -67,7 +76,6 @@ contract URORewardPoints {
             // Unstaking ERC20 token
             require(token.transfer(msg.sender, amount), "Token transfer failed");
         }
-        emit Unstaked(msg.sender, amount, block.timestamp);
     }
 
     function getTotalStaked(address user) public view returns (uint256 total) {
