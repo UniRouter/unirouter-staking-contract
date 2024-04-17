@@ -55,7 +55,11 @@ contract URORewardPoints {
 
         // Interactions
         if (address(token) != address(0)) {
+            uint256 beforeBalance = token.balanceOf(address(this));
             require(token.transferFrom(msg.sender, address(this), amount), "Token transfer failed");
+            uint256 afterBalance = token.balanceOf(address(this));
+
+            require(amount == afterBalance - beforeBalance, "DEFLATIONARY TOKENS is Not Supported");
         }
     }
 
